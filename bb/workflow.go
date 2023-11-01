@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/controlci/sdk/dynamic/bb/client"
+	"github.com/buildbeaver/go-sdk/bb/client"
 	"golang.org/x/net/context"
 )
 

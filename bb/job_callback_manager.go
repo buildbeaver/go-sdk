@@ -6,7 +6,7 @@ import (
 
 	"golang.org/x/net/context"
 
-	"github.com/controlci/sdk/dynamic/bb/client"
+	"github.com/buildbeaver/go-sdk/bb/client"
 )
 
 // JobCallback is a function that can be called when a job has transitioned to a particular state.

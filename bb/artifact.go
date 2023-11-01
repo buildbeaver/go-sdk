@@ -1,7 +1,7 @@
 package bb
 
 import (
-	"github.com/controlci/sdk/dynamic/bb/client"
+	"github.com/buildbeaver/go-sdk/bb/client"
 )
 
 type Artifact struct {

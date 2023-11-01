@@ -3,7 +3,7 @@ package bb
 import (
 	"fmt"
 
-	"github.com/controlci/sdk/dynamic/bb/client"
+	"github.com/buildbeaver/go-sdk/bb/client"
 )
 
 // ArtifactPage is a 'page' of artifacts, and allows the next and previous pages (if any) to be fetched.

@@ -5,7 +5,7 @@ import (
 
 	"golang.org/x/net/context"
 
-	"github.com/controlci/sdk/dynamic/bb/client"
+	"github.com/buildbeaver/go-sdk/bb/client"
 )
 
 // envGetter is a function that can be used to fetch environment variables.

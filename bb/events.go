@@ -3,7 +3,7 @@ package bb
 import (
 	"fmt"
 
-	"github.com/controlci/sdk/dynamic/bb/client"
+	"github.com/buildbeaver/go-sdk/bb/client"
 )
 
 type EventType string
