@@ -1,4 +1,4 @@
-module github.com/controlci/sdk/dynamic/bb
+module github.com/buildbeaver/go-sdk
 
 go 1.17
 
