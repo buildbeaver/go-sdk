@@ -1,0 +1,3102 @@
+openapi: 3.0.3
+info:
+  description: This is the BuildBeaver Dynamic Build API.
+  license:
+    name: MIT
+    url: https://opensource.org/license/mit/
+  title: BuildBeaver Dynamic Build API - OpenAPI 3.0
+  version: 0.3.00
+externalDocs:
+  description: Find out more about BuildBeaver
+  url: https://github.com/buildbeaver
+servers:
+- url: http://localhost:3003/api/v1/dynamic
+tags:
+- description: Submitting and reading Build Jobs.
+  externalDocs:
+    description: Find out more about dynamically submitting jobs
+    url: https://github.com/buildbeaver
+  name: jobs
+paths:
+  /ping:
+    get:
+      description: Checks for connectivity to the Dynamic API.
+      operationId: ping
+      responses:
+        "200":
+          description: Successful operation
+      security:
+      - jwt_build_token: []
+      summary: Checks for connectivity to the Dynamic API.
+      tags:
+      - build
+  /builds/{buildId}:
+    get:
+      description: "Reads the entire current build graph for a build, including all\
+        \ jobs and steps and their current status."
+      operationId: getBuild
+      parameters:
+      - description: The ID of the build to read.
+        example: build:4738115e-070a-44fe-bce0-b43582583eaa
+        explode: false
+        in: path
+        name: buildId
+        required: true
+        schema:
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BuildGraph'
+          description: Successful operation
+      security:
+      - jwt_build_token: []
+      summary: Reads the current build graph for a build.
+      tags:
+      - build
+  /builds/{buildId}/artifacts:
+    get:
+      description: "Reads a paginated list containing information about artifacts\
+        \ from the build, optionally filtered by search criteria."
+      operationId: listArtifacts
+      parameters:
+      - description: The ID of the build to read artifacts for.
+        example: build:4738115e-070a-44fe-bce0-b43582583eaa
+        explode: false
+        in: path
+        name: buildId
+        required: true
+        schema:
+          type: string
+        style: simple
+      - description: "If provided, only artifacts produced by this workflow will be\
+          \ returned."
+        example: build-all
+        explode: true
+        in: query
+        name: workflow
+        required: false
+        schema:
+          type: string
+        style: form
+      - description: "If provided, only artifacts produced by this job will be returned."
+        example: build-all
+        explode: true
+        in: query
+        name: job_name
+        required: false
+        schema:
+          type: string
+        style: form
+      - description: "If provided, only artifacts associated with this artifact group\
+          \ name will be returned. This name much match the name provided in the build\
+          \ definition."
+        example: reports
+        explode: true
+        in: query
+        name: group_name
+        required: false
+        schema:
+          type: string
+        style: form
+      - description: An opaque value obtained from a prior results page that can be
+          used to request the next or previous page of results. If not specified then
+          the first page of results will be returned.
+        explode: true
+        in: query
+        name: cursor
+        required: false
+        schema:
+          type: string
+        style: form
+      - description: The maximum number of results to return from this call. Additional
+          results will be available in other pages via the returned cursor values.
+        explode: true
+        in: query
+        name: limit
+        required: false
+        schema:
+          type: integer
+        style: form
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArtifactsPaginatedResponse'
+          description: Successful operation
+          links:
+            next:
+              operationId: listArtifacts
+              parameters:
+                buildID: $request.path.buildId
+      security:
+      - jwt_build_token: []
+      summary: Reads information about all or some artifacts from a build.
+      tags:
+      - build
+  /builds/{buildId}/jobs:
+    post:
+      description: "Dynamically adds a new set of jobs to a build. These jobs can\
+        \ reference each other and all previously submitted jobs for the build, and\
+        \ together form the DAG for the build."
+      operationId: createJobs
+      parameters:
+      - description: The ID of the build to which these jobs will be added
+        example: build:4738115e-070a-44fe-bce0-b43582583eaa
+        explode: false
+        in: path
+        name: buildId
+        required: true
+        schema:
+          type: string
+        style: simple
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BuildDefinition'
+        description: Definitions for a set of jobs to create and add to a build
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobGraphs'
+          description: Successful operation
+        "400":
+          description: Invalid input
+      security:
+      - jwt_build_token: []
+      summary: Creates and add a set of jobs to a build.
+      tags:
+      - jobs
+  /builds/{buildId}/events:
+    get:
+      description: Reads events relating to a build that are newer than the last event
+        previously read. Returns immediately if no new events are available.
+      operationId: getEvents
+      parameters:
+      - description: The ID of the build to read events for
+        example: build:4738115e-070a-44fe-bce0-b43582583eaa
+        explode: false
+        in: path
+        name: buildId
+        required: true
+        schema:
+          type: string
+        style: simple
+      - description: The sequence number of the last event previously received; only
+          events with higher sequence numbers than this will be returned.
+        example: 350
+        explode: true
+        in: query
+        name: last
+        required: false
+        schema:
+          format: int64
+          type: integer
+        style: form
+      - description: The maximum number of events to return
+        example: "100"
+        explode: true
+        in: query
+        name: limit
+        required: false
+        schema:
+          format: int64
+          type: integer
+        style: form
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Events'
+          description: Successful operation
+        "400":
+          description: Invalid input
+      security:
+      - jwt_build_token: []
+      summary: Reads events relating to a build.
+      tags:
+      - events
+  /jobs/{jobId}:
+    get:
+      description: "Reads information about a job. This includes the job's current\
+        \ status, but does not include steps within the job."
+      operationId: getJob
+      parameters:
+      - description: The ID of the job to read.
+        example: job:5238115e-070a-44fe-bce0-b43582583eff
+        explode: false
+        in: path
+        name: jobId
+        required: true
+        schema:
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+          description: Successful operation
+      security:
+      - jwt_build_token: []
+      summary: Reads information about a job.
+      tags:
+      - build
+  /jobs/{jobId}/graph:
+    get:
+      description: "Reads information about a job's graph, including information about\
+        \ the job's steps."
+      operationId: getJobGraph
+      parameters:
+      - description: The ID of the job to read.
+        example: job:5238115e-070a-44fe-bce0-b43582583eff
+        explode: false
+        in: path
+        name: jobId
+        required: true
+        schema:
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobGraph'
+          description: Successful operation
+      security:
+      - jwt_build_token: []
+      summary: Reads information about a job's graph.
+      tags:
+      - build
+  /artifacts/{artifactId}:
+    get:
+      description: "Reads information about a particular artifact, not the artifact\
+        \ data itself."
+      operationId: getArtifact
+      parameters:
+      - description: The ID of the artifact to read information about.
+        example: artifact:5238115e-070a-44fe-bce0-b43582583eff
+        explode: false
+        in: path
+        name: artifactId
+        required: true
+        schema:
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Artifact'
+          description: Successful operation
+      security:
+      - jwt_build_token: []
+      summary: Reads information about an artifact.
+      tags:
+      - build
+  /artifacts/{artifactId}/data:
+    get:
+      description: Reads the data for a particular artifact.
+      operationId: getArtifactData
+      parameters:
+      - description: The ID of the artifact to read information about.
+        example: artifact:5238115e-070a-44fe-bce0-b43582583eff
+        explode: false
+        in: path
+        name: artifactId
+        required: true
+        schema:
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/octet-stream:
+              schema:
+                format: binary
+                type: string
+          description: Successfully fetched the data for an artifact
+      security:
+      - jwt_build_token: []
+      summary: Reads the data for an artifact.
+      tags:
+      - build
+  /logs/{logDescriptorId}:
+    get:
+      description: Fetches a Log Descriptor containing information about part of a
+        log.
+      operationId: getLogDescriptor
+      parameters:
+      - description: The ID of the log descriptor to read.
+        example: log-descriptor:5238115e-070a-44fe-bce0-b43582583eff
+        explode: false
+        in: path
+        name: logDescriptorId
+        required: true
+        schema:
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogDescriptor'
+          description: Successful operation
+      security:
+      - jwt_build_token: []
+      summary: Fetches a Log Descriptor containing information about part of a log.
+      tags:
+      - build
+  /logs/{logDescriptorId}/data:
+    get:
+      description: "Reads the part of the data for a log, identified by the specified\
+        \ Log Descriptor ID."
+      operationId: getLogData
+      parameters:
+      - description: A Log Descriptor ID identifying the part of the log to read data
+          from.
+        example: log-descriptor:5238115e-070a-44fe-bce0-b43582583eff
+        explode: false
+        in: path
+        name: logDescriptorId
+        required: true
+        schema:
+          type: string
+        style: simple
+      - description: "If provided, only log entries with sequence numbers greater\
+          \ than or equal to start will be returned. Note that expand and start cannot\
+          \ both be specified."
+        explode: true
+        in: query
+        name: start
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: "True if the log data should be streamed as plain text, or false\
+          \ to stream a series of log entries as JSON."
+        explode: true
+        in: query
+        name: plaintext
+        required: false
+        schema:
+          type: boolean
+        style: form
+      - description: "True to expand nested log blocks in the returned data, or false\
+          \ to only include a summary. Note that expand and start cannot both be specified."
+        explode: true
+        in: query
+        name: expand
+        required: false
+        schema:
+          type: boolean
+        style: form
+      responses:
+        "200":
+          content:
+            application/octet-stream:
+              schema:
+                format: binary
+                type: string
+          description: Successfully fetched data from a log.
+      security:
+      - jwt_build_token: []
+      summary: Reads part of a log.
+      tags:
+      - build
+components:
+  schemas:
+    BuildGraph:
+      example:
+        build:
+          log_descriptor_url: log_descriptor_url
+          log_descriptor_id: log_descriptor_id
+          created_at: 2000-01-23T04:56:07.000+00:00
+          error: error
+          deleted_at: 2000-01-23T04:56:07.000+00:00
+          url: url
+          ref: ref
+          updated_at: 2000-01-23T04:56:07.000+00:00
+          opts:
+            nodes_to_run:
+            - job_name: job_name
+              workflow_name: workflow_name
+              step_name: step_name
+            - job_name: job_name
+              workflow_name: workflow_name
+              step_name: step_name
+            force: true
+          repo_id: repo_id
+          name: "234"
+          timings:
+            finished_at: 2000-01-23T04:56:07.000+00:00
+            submitted_at: 2000-01-23T04:56:07.000+00:00
+            queued_at: 2000-01-23T04:56:07.000+00:00
+            running_at: 2000-01-23T04:56:07.000+00:00
+            canceled_at: 2000-01-23T04:56:07.000+00:00
+          artifact_search_url: artifact_search_url
+          etag: etag
+          id: id
+          commit_id: commit_id
+          status: status
+        jobs:
+        - job:
+            runner_id: runner_id
+            runs_on:
+            - runs_on
+            - runs_on
+            log_descriptor_id: log_descriptor_id
+            created_at: 2000-01-23T04:56:07.000+00:00
+            description: description
+            type: docker
+            error: error
+            docker:
+              basic_auth:
+                password:
+                  value: postgres
+                  value_from_secret: database_password
+                username:
+                  value: postgres
+                  value_from_secret: database_password
+              image: golang:1.14.7
+              pull: default
+              shell: /bin/bash
+              aws_auth:
+                aws_region: us-west-2
+                aws_access_key_id:
+                  value: postgres
+                  value_from_secret: database_password
+                aws_secret_access_key:
+                  value: postgres
+                  value_from_secret: database_password
+            fingerprint_hash_type: fingerprint_hash_type
+            ref: ref
+            updated_at: 2000-01-23T04:56:07.000+00:00
+            timings:
+              finished_at: 2000-01-23T04:56:07.000+00:00
+              submitted_at: 2000-01-23T04:56:07.000+00:00
+              queued_at: 2000-01-23T04:56:07.000+00:00
+              running_at: 2000-01-23T04:56:07.000+00:00
+              canceled_at: 2000-01-23T04:56:07.000+00:00
+            fingerprint: fingerprint
+            id: id
+            artifacts:
+            - paths:
+              - paths
+              - paths
+              name: compile
+            - paths:
+              - paths
+              - paths
+              name: compile
+            log_descriptor_url: log_descriptor_url
+            workflow: front-end
+            depends:
+            - workflow: workflow
+              job_name: job_name
+              artifact_dependencies:
+              - workflow: workflow
+                job_name: job_name
+                group_name: group_name
+              - workflow: workflow
+                job_name: job_name
+                group_name: group_name
+            - workflow: workflow
+              job_name: job_name
+              artifact_dependencies:
+              - workflow: workflow
+                job_name: job_name
+                group_name: group_name
+              - workflow: workflow
+                job_name: job_name
+                group_name: group_name
+            indirect_to_job_id: indirect_to_job_id
+            indirect_job_url: indirect_job_url
+            services:
+            - basic_auth:
+                password:
+                  value: postgres
+                  value_from_secret: database_password
+                username:
+                  value: postgres
+                  value_from_secret: database_password
+              image: postgres
+              environment:
+              - name: database
+                value: postgres
+                value_from_secret: database_password
+              - name: database
+                value: postgres
+                value_from_secret: database_password
+              aws_auth:
+                aws_region: us-west-2
+                aws_access_key_id:
+                  value: postgres
+                  value_from_secret: database_password
+                aws_secret_access_key:
+                  value: postgres
+                  value_from_secret: database_password
+              name: compile
+            - basic_auth:
+                password:
+                  value: postgres
+                  value_from_secret: database_password
+                username:
+                  value: postgres
+                  value_from_secret: database_password
+              image: postgres
+              environment:
+              - name: database
+                value: postgres
+                value_from_secret: database_password
+              - name: database
+                value: postgres
+                value_from_secret: database_password
+              aws_auth:
+                aws_region: us-west-2
+                aws_access_key_id:
+                  value: postgres
+                  value_from_secret: database_password
+                aws_secret_access_key:
+                  value: postgres
+                  value_from_secret: database_password
+              name: compile
+            deleted_at: 2000-01-23T04:56:07.000+00:00
+            url: url
+            fingerprint_commands:
+            - fingerprint_commands
+            - fingerprint_commands
+            environment:
+            - name: database
+              value: postgres
+              value_from_secret: database_password
+            - name: database
+              value: postgres
+              value_from_secret: database_password
+            build_id: build_id
+            repo_id: repo_id
+            name: generate-code
+            etag: etag
+            step_execution: sequential
+            commit_id: commit_id
+            status: status
+          steps:
+          - runner_id: runner_id
+            log_descriptor_url: log_descriptor_url
+            depends:
+            - step_name: step_name
+            - step_name: step_name
+            log_descriptor_id: log_descriptor_id
+            created_at: 2000-01-23T04:56:07.000+00:00
+            description: description
+            error: error
+            deleted_at: 2000-01-23T04:56:07.000+00:00
+            url: url
+            updated_at: 2000-01-23T04:56:07.000+00:00
+            job_id: job_id
+            repo_id: repo_id
+            runner_url: runner_url
+            name: compile
+            timings:
+              finished_at: 2000-01-23T04:56:07.000+00:00
+              submitted_at: 2000-01-23T04:56:07.000+00:00
+              queued_at: 2000-01-23T04:56:07.000+00:00
+              running_at: 2000-01-23T04:56:07.000+00:00
+              canceled_at: 2000-01-23T04:56:07.000+00:00
+            etag: etag
+            id: id
+            commands:
+            - commands
+            - commands
+            status: status
+          - runner_id: runner_id
+            log_descriptor_url: log_descriptor_url
+            depends:
+            - step_name: step_name
+            - step_name: step_name
+            log_descriptor_id: log_descriptor_id
+            created_at: 2000-01-23T04:56:07.000+00:00
+            description: description
+            error: error
+            deleted_at: 2000-01-23T04:56:07.000+00:00
+            url: url
+            updated_at: 2000-01-23T04:56:07.000+00:00
+            job_id: job_id
+            repo_id: repo_id
+            runner_url: runner_url
+            name: compile
+            timings:
+              finished_at: 2000-01-23T04:56:07.000+00:00
+              submitted_at: 2000-01-23T04:56:07.000+00:00
+              queued_at: 2000-01-23T04:56:07.000+00:00
+              running_at: 2000-01-23T04:56:07.000+00:00
+              canceled_at: 2000-01-23T04:56:07.000+00:00
+            etag: etag
+            id: id
+            commands:
+            - commands
+            - commands
+            status: status
+        - job:
+            runner_id: runner_id
+            runs_on:
+            - runs_on
+            - runs_on
+            log_descriptor_id: log_descriptor_id
+            created_at: 2000-01-23T04:56:07.000+00:00
+            description: description
+            type: docker
+            error: error
+            docker:
+              basic_auth:
+                password:
+                  value: postgres
+                  value_from_secret: database_password
+                username:
+                  value: postgres
+                  value_from_secret: database_password
+              image: golang:1.14.7
+              pull: default
+              shell: /bin/bash
+              aws_auth:
+                aws_region: us-west-2
+                aws_access_key_id:
+                  value: postgres
+                  value_from_secret: database_password
+                aws_secret_access_key:
+                  value: postgres
+                  value_from_secret: database_password
+            fingerprint_hash_type: fingerprint_hash_type
+            ref: ref
+            updated_at: 2000-01-23T04:56:07.000+00:00
+            timings:
+              finished_at: 2000-01-23T04:56:07.000+00:00
+              submitted_at: 2000-01-23T04:56:07.000+00:00
+              queued_at: 2000-01-23T04:56:07.000+00:00
+              running_at: 2000-01-23T04:56:07.000+00:00
+              canceled_at: 2000-01-23T04:56:07.000+00:00
+            fingerprint: fingerprint
+            id: id
+            artifacts:
+            - paths:
+              - paths
+              - paths
+              name: compile
+            - paths:
+              - paths
+              - paths
+              name: compile
+            log_descriptor_url: log_descriptor_url
+            workflow: front-end
+            depends:
+            - workflow: workflow
+              job_name: job_name
+              artifact_dependencies:
+              - workflow: workflow
+                job_name: job_name
+                group_name: group_name
+              - workflow: workflow
+                job_name: job_name
+                group_name: group_name
+            - workflow: workflow
+              job_name: job_name
+              artifact_dependencies:
+              - workflow: workflow
+                job_name: job_name
+                group_name: group_name
+              - workflow: workflow
+                job_name: job_name
+                group_name: group_name
+            indirect_to_job_id: indirect_to_job_id
+            indirect_job_url: indirect_job_url
+            services:
+            - basic_auth:
+                password:
+                  value: postgres
+                  value_from_secret: database_password
+                username:
+                  value: postgres
+                  value_from_secret: database_password
+              image: postgres
+              environment:
+              - name: database
+                value: postgres
+                value_from_secret: database_password
+              - name: database
+                value: postgres
+                value_from_secret: database_password
+              aws_auth:
+                aws_region: us-west-2
+                aws_access_key_id:
+                  value: postgres
+                  value_from_secret: database_password
+                aws_secret_access_key:
+                  value: postgres
+                  value_from_secret: database_password
+              name: compile
+            - basic_auth:
+                password:
+                  value: postgres
+                  value_from_secret: database_password
+                username:
+                  value: postgres
+                  value_from_secret: database_password
+              image: postgres
+              environment:
+              - name: database
+                value: postgres
+                value_from_secret: database_password
+              - name: database
+                value: postgres
+                value_from_secret: database_password
+              aws_auth:
+                aws_region: us-west-2
+                aws_access_key_id:
+                  value: postgres
+                  value_from_secret: database_password
+                aws_secret_access_key:
+                  value: postgres
+                  value_from_secret: database_password
+              name: compile
+            deleted_at: 2000-01-23T04:56:07.000+00:00
+            url: url
+            fingerprint_commands:
+            - fingerprint_commands
+            - fingerprint_commands
+            environment:
+            - name: database
+              value: postgres
+              value_from_secret: database_password
+            - name: database
+              value: postgres
+              value_from_secret: database_password
+            build_id: build_id
+            repo_id: repo_id
+            name: generate-code
+            etag: etag
+            step_execution: sequential
+            commit_id: commit_id
+            status: status
+          steps:
+          - runner_id: runner_id
+            log_descriptor_url: log_descriptor_url
+            depends:
+            - step_name: step_name
+            - step_name: step_name
+            log_descriptor_id: log_descriptor_id
+            created_at: 2000-01-23T04:56:07.000+00:00
+            description: description
+            error: error
+            deleted_at: 2000-01-23T04:56:07.000+00:00
+            url: url
+            updated_at: 2000-01-23T04:56:07.000+00:00
+            job_id: job_id
+            repo_id: repo_id
+            runner_url: runner_url
+            name: compile
+            timings:
+              finished_at: 2000-01-23T04:56:07.000+00:00
+              submitted_at: 2000-01-23T04:56:07.000+00:00
+              queued_at: 2000-01-23T04:56:07.000+00:00
+              running_at: 2000-01-23T04:56:07.000+00:00
+              canceled_at: 2000-01-23T04:56:07.000+00:00
+            etag: etag
+            id: id
+            commands:
+            - commands
+            - commands
+            status: status
+          - runner_id: runner_id
+            log_descriptor_url: log_descriptor_url
+            depends:
+            - step_name: step_name
+            - step_name: step_name
+            log_descriptor_id: log_descriptor_id
+            created_at: 2000-01-23T04:56:07.000+00:00
+            description: description
+            error: error
+            deleted_at: 2000-01-23T04:56:07.000+00:00
+            url: url
+            updated_at: 2000-01-23T04:56:07.000+00:00
+            job_id: job_id
+            repo_id: repo_id
+            runner_url: runner_url
+            name: compile
+            timings:
+              finished_at: 2000-01-23T04:56:07.000+00:00
+              submitted_at: 2000-01-23T04:56:07.000+00:00
+              queued_at: 2000-01-23T04:56:07.000+00:00
+              running_at: 2000-01-23T04:56:07.000+00:00
+              canceled_at: 2000-01-23T04:56:07.000+00:00
+            etag: etag
+            id: id
+            commands:
+            - commands
+            - commands
+            status: status
+        repo:
+          legal_entity_id: legal_entity_id
+          private: true
+          build_search_url: build_search_url
+          ssh_url: ssh_url
+          link: link
+          secrets_url: secrets_url
+          created_at: 2000-01-23T04:56:07.000+00:00
+          description: description
+          external_id:
+            resource_id: resource_id
+            external_system: external_system
+          deleted_at: 2000-01-23T04:56:07.000+00:00
+          url: url
+          http_url: http_url
+          enabled: true
+          builds_url: builds_url
+          updated_at: 2000-01-23T04:56:07.000+00:00
+          ssh_key_secret_id: ssh_key_secret_id
+          external_metadata: external_metadata
+          name: my-github-repo
+          etag: etag
+          default_branch: default_branch
+          id: id
+        commit:
+          author_name: author_name
+          committer_email: committer_email
+          link: link
+          created_at: 2000-01-23T04:56:07.000+00:00
+          committer_url: committer_url
+          message: message
+          sha: sha
+          committer_name: committer_name
+          author_url: author_url
+          repo_id: repo_id
+          author_email: author_email
+          committer_id: committer_id
+          id: id
+          config_type: yaml
+          author_id: author_id
+      properties:
+        build:
+          $ref: '#/components/schemas/Build'
+        jobs:
+          description: "The current set of jobs making up the build, including the\
+            \ full job graph/steps for each."
+          items:
+            $ref: '#/components/schemas/JobGraph'
+          type: array
+        repo:
+          $ref: '#/components/schemas/Repo'
+        commit:
+          $ref: '#/components/schemas/Commit'
+      required:
+      - build
+      - commit
+      - jobs
+      - repo
+      type: object
+    Build:
+      example:
+        log_descriptor_url: log_descriptor_url
+        log_descriptor_id: log_descriptor_id
+        created_at: 2000-01-23T04:56:07.000+00:00
+        error: error
+        deleted_at: 2000-01-23T04:56:07.000+00:00
+        url: url
+        ref: ref
+        updated_at: 2000-01-23T04:56:07.000+00:00
+        opts:
+          nodes_to_run:
+          - job_name: job_name
+            workflow_name: workflow_name
+            step_name: step_name
+          - job_name: job_name
+            workflow_name: workflow_name
+            step_name: step_name
+          force: true
+        repo_id: repo_id
+        name: "234"
+        timings:
+          finished_at: 2000-01-23T04:56:07.000+00:00
+          submitted_at: 2000-01-23T04:56:07.000+00:00
+          queued_at: 2000-01-23T04:56:07.000+00:00
+          running_at: 2000-01-23T04:56:07.000+00:00
+          canceled_at: 2000-01-23T04:56:07.000+00:00
+        artifact_search_url: artifact_search_url
+        etag: etag
+        id: id
+        commit_id: commit_id
+        status: status
+      properties:
+        url:
+          description: A link to the Build resource on the BuildBeaver server
+          type: string
+        id:
+          type: string
+        created_at:
+          format: date-time
+          type: string
+        updated_at:
+          format: date-time
+          type: string
+        deleted_at:
+          format: date-time
+          type: string
+        etag:
+          type: string
+        name:
+          description: "Name of the build, in URL format. Build names are typically\
+            \ numbers converted to strings."
+          example: "234"
+          type: string
+        repo_id:
+          description: RepoID of the repo being built.
+          type: string
+        commit_id:
+          description: CommitID that is being built.
+          type: string
+        log_descriptor_id:
+          description: LogDescriptorID for the log for this build.
+          type: string
+        ref:
+          description: Ref is the git ref the build is for (e.g. branch or tag).
+          type: string
+        status:
+          description: Status reflects where the build is in the queue.
+          type: string
+        timings:
+          $ref: '#/components/schemas/WorkflowTimings'
+        error:
+          description: Error is set if the build finished with an error (or nil if
+            the build succeeded).
+          type: string
+        opts:
+          $ref: '#/components/schemas/BuildOptions'
+        log_descriptor_url:
+          description: URL of the log for this build.
+          type: string
+        artifact_search_url:
+          description: URL to use for searching for artifacts from this build.
+          type: string
+      required:
+      - artifact_search_url
+      - commit_id
+      - created_at
+      - etag
+      - id
+      - log_descriptor_id
+      - log_descriptor_url
+      - name
+      - opts
+      - ref
+      - repo_id
+      - status
+      - timings
+      - updated_at
+      - url
+      type: object
+    BuildOptions:
+      example:
+        nodes_to_run:
+        - job_name: job_name
+          workflow_name: workflow_name
+          step_name: step_name
+        - job_name: job_name
+          workflow_name: workflow_name
+          step_name: step_name
+        force: true
+      properties:
+        force:
+          description: True to force all jobs in the build to run by ignoring fingerprints.
+          type: boolean
+        nodes_to_run:
+          description: "Contains zero or more workflows, jobs and steps to run. If\
+            \ no nodes are specified then all workflows, jobs and steps will be run."
+          items:
+            $ref: '#/components/schemas/NodeFQN'
+          type: array
+      required:
+      - force
+      - nodes_to_run
+      type: object
+    NodeFQN:
+      example:
+        job_name: job_name
+        workflow_name: workflow_name
+        step_name: step_name
+      properties:
+        workflow_name:
+          type: string
+        job_name:
+          type: string
+        step_name:
+          type: string
+      required:
+      - job_name
+      - step_name
+      - workflow_name
+      type: object
+    JobGraphs:
+      items:
+        $ref: '#/components/schemas/JobGraph'
+      type: array
+    JobGraph:
+      example:
+        job:
+          runner_id: runner_id
+          runs_on:
+          - runs_on
+          - runs_on
+          log_descriptor_id: log_descriptor_id
+          created_at: 2000-01-23T04:56:07.000+00:00
+          description: description
+          type: docker
+          error: error
+          docker:
+            basic_auth:
+              password:
+                value: postgres
+                value_from_secret: database_password
+              username:
+                value: postgres
+                value_from_secret: database_password
+            image: golang:1.14.7
+            pull: default
+            shell: /bin/bash
+            aws_auth:
+              aws_region: us-west-2
+              aws_access_key_id:
+                value: postgres
+                value_from_secret: database_password
+              aws_secret_access_key:
+                value: postgres
+                value_from_secret: database_password
+          fingerprint_hash_type: fingerprint_hash_type
+          ref: ref
+          updated_at: 2000-01-23T04:56:07.000+00:00
+          timings:
+            finished_at: 2000-01-23T04:56:07.000+00:00
+            submitted_at: 2000-01-23T04:56:07.000+00:00
+            queued_at: 2000-01-23T04:56:07.000+00:00
+            running_at: 2000-01-23T04:56:07.000+00:00
+            canceled_at: 2000-01-23T04:56:07.000+00:00
+          fingerprint: fingerprint
+          id: id
+          artifacts:
+          - paths:
+            - paths
+            - paths
+            name: compile
+          - paths:
+            - paths
+            - paths
+            name: compile
+          log_descriptor_url: log_descriptor_url
+          workflow: front-end
+          depends:
+          - workflow: workflow
+            job_name: job_name
+            artifact_dependencies:
+            - workflow: workflow
+              job_name: job_name
+              group_name: group_name
+            - workflow: workflow
+              job_name: job_name
+              group_name: group_name
+          - workflow: workflow
+            job_name: job_name
+            artifact_dependencies:
+            - workflow: workflow
+              job_name: job_name
+              group_name: group_name
+            - workflow: workflow
+              job_name: job_name
+              group_name: group_name
+          indirect_to_job_id: indirect_to_job_id
+          indirect_job_url: indirect_job_url
+          services:
+          - basic_auth:
+              password:
+                value: postgres
+                value_from_secret: database_password
+              username:
+                value: postgres
+                value_from_secret: database_password
+            image: postgres
+            environment:
+            - name: database
+              value: postgres
+              value_from_secret: database_password
+            - name: database
+              value: postgres
+              value_from_secret: database_password
+            aws_auth:
+              aws_region: us-west-2
+              aws_access_key_id:
+                value: postgres
+                value_from_secret: database_password
+              aws_secret_access_key:
+                value: postgres
+                value_from_secret: database_password
+            name: compile
+          - basic_auth:
+              password:
+                value: postgres
+                value_from_secret: database_password
+              username:
+                value: postgres
+                value_from_secret: database_password
+            image: postgres
+            environment:
+            - name: database
+              value: postgres
+              value_from_secret: database_password
+            - name: database
+              value: postgres
+              value_from_secret: database_password
+            aws_auth:
+              aws_region: us-west-2
+              aws_access_key_id:
+                value: postgres
+                value_from_secret: database_password
+              aws_secret_access_key:
+                value: postgres
+                value_from_secret: database_password
+            name: compile
+          deleted_at: 2000-01-23T04:56:07.000+00:00
+          url: url
+          fingerprint_commands:
+          - fingerprint_commands
+          - fingerprint_commands
+          environment:
+          - name: database
+            value: postgres
+            value_from_secret: database_password
+          - name: database
+            value: postgres
+            value_from_secret: database_password
+          build_id: build_id
+          repo_id: repo_id
+          name: generate-code
+          etag: etag
+          step_execution: sequential
+          commit_id: commit_id
+          status: status
+        steps:
+        - runner_id: runner_id
+          log_descriptor_url: log_descriptor_url
+          depends:
+          - step_name: step_name
+          - step_name: step_name
+          log_descriptor_id: log_descriptor_id
+          created_at: 2000-01-23T04:56:07.000+00:00
+          description: description
+          error: error
+          deleted_at: 2000-01-23T04:56:07.000+00:00
+          url: url
+          updated_at: 2000-01-23T04:56:07.000+00:00
+          job_id: job_id
+          repo_id: repo_id
+          runner_url: runner_url
+          name: compile
+          timings:
+            finished_at: 2000-01-23T04:56:07.000+00:00
+            submitted_at: 2000-01-23T04:56:07.000+00:00
+            queued_at: 2000-01-23T04:56:07.000+00:00
+            running_at: 2000-01-23T04:56:07.000+00:00
+            canceled_at: 2000-01-23T04:56:07.000+00:00
+          etag: etag
+          id: id
+          commands:
+          - commands
+          - commands
+          status: status
+        - runner_id: runner_id
+          log_descriptor_url: log_descriptor_url
+          depends:
+          - step_name: step_name
+          - step_name: step_name
+          log_descriptor_id: log_descriptor_id
+          created_at: 2000-01-23T04:56:07.000+00:00
+          description: description
+          error: error
+          deleted_at: 2000-01-23T04:56:07.000+00:00
+          url: url
+          updated_at: 2000-01-23T04:56:07.000+00:00
+          job_id: job_id
+          repo_id: repo_id
+          runner_url: runner_url
+          name: compile
+          timings:
+            finished_at: 2000-01-23T04:56:07.000+00:00
+            submitted_at: 2000-01-23T04:56:07.000+00:00
+            queued_at: 2000-01-23T04:56:07.000+00:00
+            running_at: 2000-01-23T04:56:07.000+00:00
+            canceled_at: 2000-01-23T04:56:07.000+00:00
+          etag: etag
+          id: id
+          commands:
+          - commands
+          - commands
+          status: status
+      properties:
+        job:
+          $ref: '#/components/schemas/Job'
+        steps:
+          description: The set of steps within the job
+          items:
+            $ref: '#/components/schemas/Step'
+          type: array
+      required:
+      - job
+      - steps
+      type: object
+    JobGraph2:
+      allOf:
+      - $ref: '#/components/schemas/Job'
+      - $ref: '#/components/schemas/JobGraph2_allOf'
+    Job:
+      example:
+        runner_id: runner_id
+        runs_on:
+        - runs_on
+        - runs_on
+        log_descriptor_id: log_descriptor_id
+        created_at: 2000-01-23T04:56:07.000+00:00
+        description: description
+        type: docker
+        error: error
+        docker:
+          basic_auth:
+            password:
+              value: postgres
+              value_from_secret: database_password
+            username:
+              value: postgres
+              value_from_secret: database_password
+          image: golang:1.14.7
+          pull: default
+          shell: /bin/bash
+          aws_auth:
+            aws_region: us-west-2
+            aws_access_key_id:
+              value: postgres
+              value_from_secret: database_password
+            aws_secret_access_key:
+              value: postgres
+              value_from_secret: database_password
+        fingerprint_hash_type: fingerprint_hash_type
+        ref: ref
+        updated_at: 2000-01-23T04:56:07.000+00:00
+        timings:
+          finished_at: 2000-01-23T04:56:07.000+00:00
+          submitted_at: 2000-01-23T04:56:07.000+00:00
+          queued_at: 2000-01-23T04:56:07.000+00:00
+          running_at: 2000-01-23T04:56:07.000+00:00
+          canceled_at: 2000-01-23T04:56:07.000+00:00
+        fingerprint: fingerprint
+        id: id
+        artifacts:
+        - paths:
+          - paths
+          - paths
+          name: compile
+        - paths:
+          - paths
+          - paths
+          name: compile
+        log_descriptor_url: log_descriptor_url
+        workflow: front-end
+        depends:
+        - workflow: workflow
+          job_name: job_name
+          artifact_dependencies:
+          - workflow: workflow
+            job_name: job_name
+            group_name: group_name
+          - workflow: workflow
+            job_name: job_name
+            group_name: group_name
+        - workflow: workflow
+          job_name: job_name
+          artifact_dependencies:
+          - workflow: workflow
+            job_name: job_name
+            group_name: group_name
+          - workflow: workflow
+            job_name: job_name
+            group_name: group_name
+        indirect_to_job_id: indirect_to_job_id
+        indirect_job_url: indirect_job_url
+        services:
+        - basic_auth:
+            password:
+              value: postgres
+              value_from_secret: database_password
+            username:
+              value: postgres
+              value_from_secret: database_password
+          image: postgres
+          environment:
+          - name: database
+            value: postgres
+            value_from_secret: database_password
+          - name: database
+            value: postgres
+            value_from_secret: database_password
+          aws_auth:
+            aws_region: us-west-2
+            aws_access_key_id:
+              value: postgres
+              value_from_secret: database_password
+            aws_secret_access_key:
+              value: postgres
+              value_from_secret: database_password
+          name: compile
+        - basic_auth:
+            password:
+              value: postgres
+              value_from_secret: database_password
+            username:
+              value: postgres
+              value_from_secret: database_password
+          image: postgres
+          environment:
+          - name: database
+            value: postgres
+            value_from_secret: database_password
+          - name: database
+            value: postgres
+            value_from_secret: database_password
+          aws_auth:
+            aws_region: us-west-2
+            aws_access_key_id:
+              value: postgres
+              value_from_secret: database_password
+            aws_secret_access_key:
+              value: postgres
+              value_from_secret: database_password
+          name: compile
+        deleted_at: 2000-01-23T04:56:07.000+00:00
+        url: url
+        fingerprint_commands:
+        - fingerprint_commands
+        - fingerprint_commands
+        environment:
+        - name: database
+          value: postgres
+          value_from_secret: database_password
+        - name: database
+          value: postgres
+          value_from_secret: database_password
+        build_id: build_id
+        repo_id: repo_id
+        name: generate-code
+        etag: etag
+        step_execution: sequential
+        commit_id: commit_id
+        status: status
+      properties:
+        url:
+          description: A link to the Job resource on the BuildBeaver server
+          type: string
+        id:
+          type: string
+        created_at:
+          format: date-time
+          type: string
+        updated_at:
+          format: date-time
+          type: string
+        deleted_at:
+          format: date-time
+          type: string
+        etag:
+          type: string
+        name:
+          description: "Job name, in URL format"
+          example: generate-code
+          type: string
+        workflow:
+          description: "Workflow the job is a part of, or empty if the job is part\
+            \ of the default workflow."
+          example: front-end
+          type: string
+        description:
+          description: Optional human-readable description of the job.
+          type: string
+        type:
+          description: "Type of the job (e.g. docker, exec etc.)"
+          enum:
+          - docker
+          - exec
+          type: string
+        runs_on:
+          description: RunsOn contains a set of labels that this job requires runners
+            to have.
+          items:
+            type: string
+          type: array
+        docker:
+          $ref: '#/components/schemas/DockerConfig'
+        step_execution:
+          description: Determines how the runner will execute steps within this job
+          enum:
+          - sequential
+          - parallel
+          type: string
+        depends:
+          description: "Dependencies on other jobs and their artifacts. Each JobDependency\
+            \ declares that this job depends on the successful execution of another,\
+            \ and optionally that this job consumes one or more artifacts from the\
+            \ other."
+          items:
+            $ref: '#/components/schemas/JobDependency'
+          type: array
+        services:
+          description: "Services to run in the background for the duration of the\
+            \ job; services are started before the first step is run, and stopped\
+            \ after the last step completes"
+          items:
+            $ref: '#/components/schemas/Service'
+          type: array
+        fingerprint_commands:
+          description: Shell commands to execute to generate a unique fingerprint
+            for the jobs; two jobs in the same repo with the same name and fingerprint
+            are considered identical
+          items:
+            type: string
+          type: array
+        artifacts:
+          description: A list of all artifacts the job is expected to produce that
+            will be saved to the artifact store at the end of the job's execution
+          items:
+            $ref: '#/components/schemas/ArtifactDefinition'
+          type: array
+        environment:
+          description: A list of environment variables to export prior to executing
+            the job
+          items:
+            $ref: '#/components/schemas/EnvVar'
+          type: array
+        build_id:
+          description: ID of the build this job forms a part of.
+          type: string
+        repo_id:
+          description: RepoID that was committed to.
+          type: string
+        commit_id:
+          description: CommitID that the job was generated from.
+          type: string
+        log_descriptor_id:
+          description: LogDescriptorID points to the log for this job.
+          type: string
+        runner_id:
+          description: "RunnerID is the id of the runner this job executed on, or\
+            \ empty if the job has not run yet (or did/will not run)."
+          type: string
+        indirect_to_job_id:
+          description: IndirectToJobID records the ID of a job that previously ran
+            successfully as part of another build and which is functionally identical
+            to this job. If this is set it means this job did not actually run to
+            avoid redundantly running the same thing more than once.
+          type: string
+        ref:
+          description: Ref is the git ref from the build that the job was generated
+            from (e.g. branch or tag)
+          type: string
+        status:
+          description: Status reflects where the job is in the queue.
+          type: string
+        error:
+          description: Error is set if the job finished with an error (or empty if
+            the job succeeded).
+          type: string
+        timings:
+          $ref: '#/components/schemas/WorkflowTimings'
+        fingerprint:
+          description: "Fingerprint contains the hashed output of FingerprintCommands,\
+            \ as well as any other inputs the agent added (such as artifact hashes).\
+            \ This is only available after the job has run successfully."
+          type: string
+        fingerprint_hash_type:
+          description: FingerprintHashType is the type of hashing algorithm used to
+            produce the fingerprint.
+          type: string
+        log_descriptor_url:
+          description: URL of the log for this job.
+          type: string
+        indirect_job_url:
+          description: "URL to the job that this job indirects to, if any."
+          type: string
+      required:
+      - build_id
+      - commit_id
+      - created_at
+      - depends
+      - description
+      - environment
+      - etag
+      - fingerprint_commands
+      - id
+      - indirect_job_url
+      - indirect_to_job_id
+      - log_descriptor_id
+      - log_descriptor_url
+      - name
+      - ref
+      - repo_id
+      - runner_id
+      - runs_on
+      - services
+      - status
+      - step_execution
+      - timings
+      - type
+      - updated_at
+      - url
+      - workflow
+      type: object
+    DockerConfig:
+      example:
+        basic_auth:
+          password:
+            value: postgres
+            value_from_secret: database_password
+          username:
+            value: postgres
+            value_from_secret: database_password
+        image: golang:1.14.7
+        pull: default
+        shell: /bin/bash
+        aws_auth:
+          aws_region: us-west-2
+          aws_access_key_id:
+            value: postgres
+            value_from_secret: database_password
+          aws_secret_access_key:
+            value: postgres
+            value_from_secret: database_password
+      properties:
+        image:
+          description: "The default Docker image to run the job steps in, if the job\
+            \ is of type Docker"
+          example: golang:1.14.7
+          type: string
+        pull:
+          description: "Determines if/when the Docker image is pulled during job execution,\
+            \ if the job is of type Docker"
+          enum:
+          - default
+          - never
+          - always
+          - if-not-exists
+          type: string
+        basic_auth:
+          $ref: '#/components/schemas/DockerBasicAuth'
+        aws_auth:
+          $ref: '#/components/schemas/DockerAWSAuth'
+        shell:
+          description: Path to the shell to use to run build scripts with inside the
+            container
+          example: /bin/bash
+          type: string
+      required:
+      - image
+      - pull
+      type: object
+    JobDependency:
+      example:
+        workflow: workflow
+        job_name: job_name
+        artifact_dependencies:
+        - workflow: workflow
+          job_name: job_name
+          group_name: group_name
+        - workflow: workflow
+          job_name: job_name
+          group_name: group_name
+      properties:
+        workflow:
+          description: "The name of the workflow containing the job that must complete,\
+            \ or an empty string for the default workflow."
+          type: string
+        job_name:
+          description: The name of the job that must complete.
+          type: string
+        artifact_dependencies:
+          description: The set of artifacts required from the job that must complete.
+          items:
+            $ref: '#/components/schemas/ArtifactDependency'
+          type: array
+      required:
+      - artifact_dependencies
+      - job_name
+      - workflow
+      type: object
+    ArtifactDependency:
+      example:
+        workflow: workflow
+        job_name: job_name
+        group_name: group_name
+      properties:
+        workflow:
+          description: "The name of the workflow containing the job that will produce\
+            \ the artifact(s), or an empty string for the default workflow."
+          type: string
+        job_name:
+          description: The name of the job that that will produce the artifact(s).
+          type: string
+        group_name:
+          description: The name of the group of artifacts.
+          type: string
+      required:
+      - group_name
+      - job_name
+      - workflow
+      type: object
+    Service:
+      example:
+        basic_auth:
+          password:
+            value: postgres
+            value_from_secret: database_password
+          username:
+            value: postgres
+            value_from_secret: database_password
+        image: postgres
+        environment:
+        - name: database
+          value: postgres
+          value_from_secret: database_password
+        - name: database
+          value: postgres
+          value_from_secret: database_password
+        aws_auth:
+          aws_region: us-west-2
+          aws_access_key_id:
+            value: postgres
+            value_from_secret: database_password
+          aws_secret_access_key:
+            value: postgres
+            value_from_secret: database_password
+        name: compile
+      properties:
+        name:
+          description: "Unique name of the service, within the parent job."
+          example: compile
+          type: string
+        image:
+          description: Name of the Docker image for the service to run.
+          example: postgres
+          type: string
+        basic_auth:
+          $ref: '#/components/schemas/DockerBasicAuth'
+        aws_auth:
+          $ref: '#/components/schemas/DockerAWSAuth'
+        environment:
+          description: A list of environment variables to export prior to starting
+            the service.
+          items:
+            $ref: '#/components/schemas/EnvVar'
+          type: array
+      required:
+      - environment
+      - image
+      - name
+      type: object
+    SecretString:
+      example:
+        value: postgres
+        value_from_secret: database_password
+      properties:
+        value:
+          description: "An explicit, non-secret value for an environment variable\
+            \ or field."
+          example: postgres
+          type: string
+        value_from_secret:
+          description: "The name of the secret that contains the value, for an environment\
+            \ variable or field."
+          example: database_password
+          type: string
+      type: object
+    DockerBasicAuth:
+      example:
+        password:
+          value: postgres
+          value_from_secret: database_password
+        username:
+          value: postgres
+          value_from_secret: database_password
+      properties:
+        username:
+          $ref: '#/components/schemas/SecretString'
+        password:
+          $ref: '#/components/schemas/SecretString'
+      required:
+      - password
+      - username
+      type: object
+    DockerAWSAuth:
+      example:
+        aws_region: us-west-2
+        aws_access_key_id:
+          value: postgres
+          value_from_secret: database_password
+        aws_secret_access_key:
+          value: postgres
+          value_from_secret: database_password
+      properties:
+        aws_region:
+          description: The ECR AWS region to authenticate to.
+          example: us-west-2
+          type: string
+        aws_access_key_id:
+          $ref: '#/components/schemas/SecretString'
+        aws_secret_access_key:
+          $ref: '#/components/schemas/SecretString'
+      required:
+      - aws_access_key_id
+      - aws_secret_access_key
+      type: object
+    EnvVar:
+      example:
+        name: database
+        value: postgres
+        value_from_secret: database_password
+      properties:
+        name:
+          description: Name of the environment variable.
+          example: database
+          type: string
+        value:
+          description: "Value of the variable, if the variable is set explicitly."
+          example: postgres
+          type: string
+        value_from_secret:
+          description: "ValueFromSecret is the name of the secret to set this variable\
+            \ to, if setting the variable to a secret."
+          example: database_password
+          type: string
+      required:
+      - name
+      type: object
+    Step:
+      example:
+        runner_id: runner_id
+        log_descriptor_url: log_descriptor_url
+        depends:
+        - step_name: step_name
+        - step_name: step_name
+        log_descriptor_id: log_descriptor_id
+        created_at: 2000-01-23T04:56:07.000+00:00
+        description: description
+        error: error
+        deleted_at: 2000-01-23T04:56:07.000+00:00
+        url: url
+        updated_at: 2000-01-23T04:56:07.000+00:00
+        job_id: job_id
+        repo_id: repo_id
+        runner_url: runner_url
+        name: compile
+        timings:
+          finished_at: 2000-01-23T04:56:07.000+00:00
+          submitted_at: 2000-01-23T04:56:07.000+00:00
+          queued_at: 2000-01-23T04:56:07.000+00:00
+          running_at: 2000-01-23T04:56:07.000+00:00
+          canceled_at: 2000-01-23T04:56:07.000+00:00
+        etag: etag
+        id: id
+        commands:
+        - commands
+        - commands
+        status: status
+      properties:
+        url:
+          description: A link to the Step resource on the BuildBeaver server
+          type: string
+        id:
+          type: string
+        created_at:
+          format: date-time
+          type: string
+        updated_at:
+          format: date-time
+          type: string
+        deleted_at:
+          format: date-time
+          type: string
+        etag:
+          type: string
+        name:
+          description: "Step name, in URL format"
+          example: compile
+          type: string
+        description:
+          description: Optional human-readable description of the job.
+          type: string
+        commands:
+          description: A list of one or more shell commands to execute during the
+            step.
+          items:
+            type: string
+          type: array
+        depends:
+          description: Dependencies this step has on other steps within the job (see
+            dependency syntax)
+          items:
+            $ref: '#/components/schemas/StepDependency'
+          type: array
+        job_id:
+          description: ID of the job this step forms a part of
+          type: string
+        repo_id:
+          description: RepoID that the step is building from.
+          type: string
+        runner_id:
+          description: RunnerID that ran the step (or empty if the step has not run
+            yet).
+          type: string
+        log_descriptor_id:
+          description: LogDescriptorID points to the log for this step.
+          type: string
+        status:
+          description: Status reflects where the step is in processing.
+          type: string
+        error:
+          description: Error is set if the step finished with an error (or empty if
+            the step succeeded).
+          type: string
+        timings:
+          $ref: '#/components/schemas/WorkflowTimings'
+        runner_url:
+          description: URL of the runner that ran the step (or empty if the step has
+            not run yet).
+          type: string
+        log_descriptor_url:
+          description: URL of the log for this step.
+          type: string
+      required:
+      - artifacts
+      - commands
+      - created_at
+      - depends
+      - description
+      - etag
+      - id
+      - job_id
+      - log_descriptor_id
+      - log_descriptor_url
+      - name
+      - repo_id
+      - runner_id
+      - runner_url
+      - status
+      - timings
+      - updated_at
+      - url
+      type: object
+    StepDependency:
+      example:
+        step_name: step_name
+      properties:
+        step_name:
+          description: The name of the step that must complete before this step.
+          type: string
+      required:
+      - step_name
+      type: object
+    ArtifactsPaginatedResponse:
+      example:
+        prev_cursor: prev_cursor
+        next_cursor: next_cursor
+        kind: kind
+        next_url: next_url
+        prev_url: prev_url
+        results:
+        - group_name: group_name
+          sealed: true
+          mime: mime
+          created_at: 2000-01-23T04:56:07.000+00:00
+          step_id: step_id
+          url: url
+          path: path
+          updated_at: 2000-01-23T04:56:07.000+00:00
+          size: 0
+          name: name
+          etag: etag
+          id: id
+          data_url: data_url
+          hash: hash
+          hash_type: BLAKE2B
+        - group_name: group_name
+          sealed: true
+          mime: mime
+          created_at: 2000-01-23T04:56:07.000+00:00
+          step_id: step_id
+          url: url
+          path: path
+          updated_at: 2000-01-23T04:56:07.000+00:00
+          size: 0
+          name: name
+          etag: etag
+          id: id
+          data_url: data_url
+          hash: hash
+          hash_type: BLAKE2B
+      properties:
+        kind:
+          description: "The type of objects contained in the results, in this case\
+            \ 'artifact'"
+          type: string
+        results:
+          items:
+            $ref: '#/components/schemas/Artifact'
+          type: array
+        prev_url:
+          description: A URL to fetch to obtain the previous page of results before
+            this one.
+          type: string
+        prev_cursor:
+          description: A cursor that can be used as a query parameter to obtain the
+            previous page of results before this one.
+          type: string
+        next_url:
+          description: A URL to fetch to obtain the next page of results after this
+            one.
+          type: string
+        next_cursor:
+          description: A cursor that can be used as a query parameter to obtain the
+            next page of results after this one.
+          type: string
+      required:
+      - kind
+      - results
+      type: object
+    Artifact:
+      example:
+        group_name: group_name
+        sealed: true
+        mime: mime
+        created_at: 2000-01-23T04:56:07.000+00:00
+        step_id: step_id
+        url: url
+        path: path
+        updated_at: 2000-01-23T04:56:07.000+00:00
+        size: 0
+        name: name
+        etag: etag
+        id: id
+        data_url: data_url
+        hash: hash
+        hash_type: BLAKE2B
+      properties:
+        url:
+          description: A link to the Artifact on the BuildBeaver server
+          type: string
+        id:
+          type: string
+        created_at:
+          format: date-time
+          type: string
+        updated_at:
+          format: date-time
+          type: string
+        etag:
+          type: string
+        name:
+          description: Name of the artifact.
+          type: string
+        step_id:
+          description: The ID of the step (within a job) that created this artifact.
+          type: string
+        group_name:
+          description: The name associated with the one or more artifacts identified
+            by an ArtifactDefinition in the build config.
+          type: string
+        path:
+          description: "The filesystem path that the artifact was found at, relative\
+            \ to the job workspace."
+          type: string
+        hash_type:
+          description: tThe type of hashing algorithm used to hash the data.
+          enum:
+          - BLAKE2B
+          - SHA1
+          - SHA256
+          - MD5
+          - FNV
+          type: string
+        hash:
+          description: The hex-encoded hash of the artifact data. This This may be
+            set later if the hash is not known yet.
+          type: string
+        size:
+          description: Size of the artifact file in bytes.
+          format: uint64
+          type: integer
+        mime:
+          description: "Mime type of the artifact, or empty if not known."
+          type: string
+        sealed:
+          description: "Sealed is true once the data for the artifact has successfully\
+            \ been uploaded and the file contents are now locked. Until Sealed is\
+            \ true various pieces of metadata such as the file size and hash etc.\
+            \ will be unset. Note that if sealed is false it doesn't necessarily mean\
+            \ no data has been uploaded to the blob store yet, and so we must still\
+            \ verify that the backing data is deleted before garbage collecting unsealed\
+            \ artifact files."
+          type: boolean
+        data_url:
+          description: URL to use for fetching the bytes of data making up the artifact.
+          type: string
+      required:
+      - created_at
+      - data_url
+      - etag
+      - group_name
+      - hash
+      - hash_type
+      - id
+      - mime
+      - name
+      - path
+      - sealed
+      - size
+      - step_id
+      - updated_at
+      - url
+      type: object
+    ExternalResourceID:
+      example:
+        resource_id: resource_id
+        external_system: external_system
+      properties:
+        external_system:
+          description: "The name of the external system, e.g. GitHub"
+          type: string
+        resource_id:
+          description: "The resource within the external system, e.g. github_repo.id"
+          type: string
+      required:
+      - external_system
+      - resource_id
+      type: object
+    WorkflowTimings:
+      example:
+        finished_at: 2000-01-23T04:56:07.000+00:00
+        submitted_at: 2000-01-23T04:56:07.000+00:00
+        queued_at: 2000-01-23T04:56:07.000+00:00
+        running_at: 2000-01-23T04:56:07.000+00:00
+        canceled_at: 2000-01-23T04:56:07.000+00:00
+      properties:
+        queued_at:
+          format: date-time
+          type: string
+        submitted_at:
+          format: date-time
+          type: string
+        running_at:
+          format: date-time
+          type: string
+        finished_at:
+          format: date-time
+          type: string
+        canceled_at:
+          format: date-time
+          type: string
+      type: object
+    Repo:
+      example:
+        legal_entity_id: legal_entity_id
+        private: true
+        build_search_url: build_search_url
+        ssh_url: ssh_url
+        link: link
+        secrets_url: secrets_url
+        created_at: 2000-01-23T04:56:07.000+00:00
+        description: description
+        external_id:
+          resource_id: resource_id
+          external_system: external_system
+        deleted_at: 2000-01-23T04:56:07.000+00:00
+        url: url
+        http_url: http_url
+        enabled: true
+        builds_url: builds_url
+        updated_at: 2000-01-23T04:56:07.000+00:00
+        ssh_key_secret_id: ssh_key_secret_id
+        external_metadata: external_metadata
+        name: my-github-repo
+        etag: etag
+        default_branch: default_branch
+        id: id
+      properties:
+        url:
+          description: A link to the Repo resource on the BuildBeaver server.
+          type: string
+        id:
+          type: string
+        created_at:
+          format: date-time
+          type: string
+        updated_at:
+          format: date-time
+          type: string
+        deleted_at:
+          format: date-time
+          type: string
+        etag:
+          type: string
+        name:
+          description: Name of the repo.
+          example: my-github-repo
+          type: string
+        description:
+          description: "A description of the repo, taken from the Source Control Management\
+            \ system (e.g. GitHub)."
+          type: string
+        legal_entity_id:
+          description: The ID of the Legal Entity (person or company) that owns this
+            repo.
+          type: string
+        ssh_url:
+          description: The URL of this repo on the Source Control Management system
+            (e.g. GitHub) for SSH access to the repo.
+          type: string
+        http_url:
+          description: The URL of this repo on the Source Control Management system
+            (e.g. GitHub) for HTTP access to the repo.
+          type: string
+        link:
+          description: "A link (URL) to the Repo on the Web, for users to browse to."
+          type: string
+        default_branch:
+          description: The name of the default branch on this repo (typically 'main'
+            or 'master')
+          type: string
+        private:
+          description: "True if this is a private repo, false if it is public."
+          type: boolean
+        enabled:
+          description: True if builds are enabled for this repo.
+          type: boolean
+        ssh_key_secret_id:
+          description: The ID of the secret containing the SSH key to use to check
+            out code from the repo.
+          type: string
+        external_id:
+          $ref: '#/components/schemas/ExternalResourceID'
+        external_metadata:
+          description: Extra information relating to the repo in the Source Control
+            Management system (e.g. GitHub). The exact information stored here will
+            depend on which SCM contains the repo.
+          type: string
+        builds_url:
+          description: URL to fetch a list of builds for this repo.
+          type: string
+        build_search_url:
+          description: URL to search for specific builds for this repo.
+          type: string
+        secrets_url:
+          description: URL to fetch secrets for this repo (subject to access control).
+          type: string
+      required:
+      - build_search_url
+      - builds_url
+      - created_at
+      - default_branch
+      - description
+      - enabled
+      - etag
+      - external_metadata
+      - http_url
+      - id
+      - legal_entity_id
+      - link
+      - name
+      - private
+      - secrets_url
+      - ssh_url
+      - updated_at
+      - url
+      type: object
+    Commit:
+      example:
+        author_name: author_name
+        committer_email: committer_email
+        link: link
+        created_at: 2000-01-23T04:56:07.000+00:00
+        committer_url: committer_url
+        message: message
+        sha: sha
+        committer_name: committer_name
+        author_url: author_url
+        repo_id: repo_id
+        author_email: author_email
+        committer_id: committer_id
+        id: id
+        config_type: yaml
+        author_id: author_id
+      properties:
+        id:
+          type: string
+        created_at:
+          format: date-time
+          type: string
+        repo_id:
+          description: ID of the repo that the commit was made against.
+          type: string
+        config_type:
+          description: The type of the config file found in the commit (Config itself
+            is not included in the document).
+          enum:
+          - yaml
+          - json
+          - jsonnet
+          - unknown
+          type: string
+        sha:
+          description: The unique SHA hash of the commit.
+          type: string
+        message:
+          description: The commit message.
+          type: string
+        author_id:
+          description: "The ID of the legal entity that authored the commit, if known."
+          type: string
+        author_name:
+          description: The author name recorded on the commit.
+          type: string
+        author_email:
+          description: The author email address recorded on the commit.
+          type: string
+        committer_id:
+          description: "The ID of the legal entity that committed the commit, if known."
+          type: string
+        committer_name:
+          description: "The committer name recorded on the commit, if any."
+          type: string
+        committer_email:
+          description: "The committer email address recorded on the commit, if any."
+          type: string
+        link:
+          description: "A link (URL) to the Commit in the SCM, for users to browse\
+            \ to."
+          type: string
+        committer_url:
+          description: URL to fetch additional information about the committer of
+            this commit.
+          type: string
+        author_url:
+          description: URL to fetch additional information about the author of this
+            commit.
+          type: string
+      required:
+      - author_email
+      - author_id
+      - author_name
+      - author_url
+      - committer_email
+      - committer_id
+      - committer_name
+      - committer_url
+      - config_type
+      - created_at
+      - id
+      - link
+      - message
+      - repo_id
+      - sha
+      type: object
+    BuildDefinition:
+      example:
+        jobs:
+        - workflow: workflow1
+          depends:
+          - depends
+          - depends
+          runs_on:
+          - runs_on
+          - runs_on
+          description: description
+          services:
+          - basic_auth:
+              password:
+                value: postgres
+                from_secret: database_password
+              username:
+                value: postgres
+                from_secret: database_password
+            image: postgres
+            environment:
+              key:
+                value: postgres
+                from_secret: database_password
+            aws_auth:
+              aws_region: us-west-2
+              aws_access_key_id:
+                value: postgres
+                from_secret: database_password
+              aws_secret_access_key:
+                value: postgres
+                from_secret: database_password
+            name: compile
+          - basic_auth:
+              password:
+                value: postgres
+                from_secret: database_password
+              username:
+                value: postgres
+                from_secret: database_password
+            image: postgres
+            environment:
+              key:
+                value: postgres
+                from_secret: database_password
+            aws_auth:
+              aws_region: us-west-2
+              aws_access_key_id:
+                value: postgres
+                from_secret: database_password
+              aws_secret_access_key:
+                value: postgres
+                from_secret: database_password
+            name: compile
+          type: docker
+          steps:
+          - depends:
+            - depends
+            - depends
+            name: compile
+            description: description
+            commands:
+            - commands
+            - commands
+          - depends:
+            - depends
+            - depends
+            name: compile
+            description: description
+            commands:
+            - commands
+            - commands
+          docker:
+            basic_auth:
+              password:
+                value: postgres
+                from_secret: database_password
+              username:
+                value: postgres
+                from_secret: database_password
+            image: golang:1.14.7
+            pull: default
+            shell: /bin/bash
+            aws_auth:
+              aws_region: us-west-2
+              aws_access_key_id:
+                value: postgres
+                from_secret: database_password
+              aws_secret_access_key:
+                value: postgres
+                from_secret: database_password
+          environment:
+            key:
+              value: postgres
+              from_secret: database_password
+          name: "generate-code, or workflow1.generate-code"
+          fingerprint:
+          - fingerprint
+          - fingerprint
+          step_execution: sequential
+          artifacts:
+          - paths:
+            - paths
+            - paths
+            name: compile
+          - paths:
+            - paths
+            - paths
+            name: compile
+        - workflow: workflow1
+          depends:
+          - depends
+          - depends
+          runs_on:
+          - runs_on
+          - runs_on
+          description: description
+          services:
+          - basic_auth:
+              password:
+                value: postgres
+                from_secret: database_password
+              username:
+                value: postgres
+                from_secret: database_password
+            image: postgres
+            environment:
+              key:
+                value: postgres
+                from_secret: database_password
+            aws_auth:
+              aws_region: us-west-2
+              aws_access_key_id:
+                value: postgres
+                from_secret: database_password
+              aws_secret_access_key:
+                value: postgres
+                from_secret: database_password
+            name: compile
+          - basic_auth:
+              password:
+                value: postgres
+                from_secret: database_password
+              username:
+                value: postgres
+                from_secret: database_password
+            image: postgres
+            environment:
+              key:
+                value: postgres
+                from_secret: database_password
+            aws_auth:
+              aws_region: us-west-2
+              aws_access_key_id:
+                value: postgres
+                from_secret: database_password
+              aws_secret_access_key:
+                value: postgres
+                from_secret: database_password
+            name: compile
+          type: docker
+          steps:
+          - depends:
+            - depends
+            - depends
+            name: compile
+            description: description
+            commands:
+            - commands
+            - commands
+          - depends:
+            - depends
+            - depends
+            name: compile
+            description: description
+            commands:
+            - commands
+            - commands
+          docker:
+            basic_auth:
+              password:
+                value: postgres
+                from_secret: database_password
+              username:
+                value: postgres
+                from_secret: database_password
+            image: golang:1.14.7
+            pull: default
+            shell: /bin/bash
+            aws_auth:
+              aws_region: us-west-2
+              aws_access_key_id:
+                value: postgres
+                from_secret: database_password
+              aws_secret_access_key:
+                value: postgres
+                from_secret: database_password
+          environment:
+            key:
+              value: postgres
+              from_secret: database_password
+          name: "generate-code, or workflow1.generate-code"
+          fingerprint:
+          - fingerprint
+          - fingerprint
+          step_execution: sequential
+          artifacts:
+          - paths:
+            - paths
+            - paths
+            name: compile
+          - paths:
+            - paths
+            - paths
+            name: compile
+        version: "0.3"
+      properties:
+        version:
+          description: The version number of the build definition format used
+          enum:
+          - "0.3"
+          type: string
+        jobs:
+          items:
+            $ref: '#/components/schemas/JobDefinition'
+          type: array
+      required:
+      - jobs
+      - version
+      type: object
+    JobDefinition:
+      example:
+        workflow: workflow1
+        depends:
+        - depends
+        - depends
+        runs_on:
+        - runs_on
+        - runs_on
+        description: description
+        services:
+        - basic_auth:
+            password:
+              value: postgres
+              from_secret: database_password
+            username:
+              value: postgres
+              from_secret: database_password
+          image: postgres
+          environment:
+            key:
+              value: postgres
+              from_secret: database_password
+          aws_auth:
+            aws_region: us-west-2
+            aws_access_key_id:
+              value: postgres
+              from_secret: database_password
+            aws_secret_access_key:
+              value: postgres
+              from_secret: database_password
+          name: compile
+        - basic_auth:
+            password:
+              value: postgres
+              from_secret: database_password
+            username:
+              value: postgres
+              from_secret: database_password
+          image: postgres
+          environment:
+            key:
+              value: postgres
+              from_secret: database_password
+          aws_auth:
+            aws_region: us-west-2
+            aws_access_key_id:
+              value: postgres
+              from_secret: database_password
+            aws_secret_access_key:
+              value: postgres
+              from_secret: database_password
+          name: compile
+        type: docker
+        steps:
+        - depends:
+          - depends
+          - depends
+          name: compile
+          description: description
+          commands:
+          - commands
+          - commands
+        - depends:
+          - depends
+          - depends
+          name: compile
+          description: description
+          commands:
+          - commands
+          - commands
+        docker:
+          basic_auth:
+            password:
+              value: postgres
+              from_secret: database_password
+            username:
+              value: postgres
+              from_secret: database_password
+          image: golang:1.14.7
+          pull: default
+          shell: /bin/bash
+          aws_auth:
+            aws_region: us-west-2
+            aws_access_key_id:
+              value: postgres
+              from_secret: database_password
+            aws_secret_access_key:
+              value: postgres
+              from_secret: database_password
+        environment:
+          key:
+            value: postgres
+            from_secret: database_password
+        name: "generate-code, or workflow1.generate-code"
+        fingerprint:
+        - fingerprint
+        - fingerprint
+        step_execution: sequential
+        artifacts:
+        - paths:
+          - paths
+          - paths
+          name: compile
+        - paths:
+          - paths
+          - paths
+          name: compile
+      properties:
+        name:
+          description: "Job name. This can optionally include a workflow as a prefix\
+            \ (dot-separated), as an alternative to specifying an explicit 'workflow'\
+            \ element."
+          example: "generate-code, or workflow1.generate-code"
+          type: string
+        workflow:
+          description: Workflow the job is a part of. If not specified then the job
+            is part of the default workflow.
+          example: workflow1
+          type: string
+        description:
+          description: Optional human-readable description of the job.
+          type: string
+        type:
+          description: "Type of the job (e.g. docker, exec etc.)"
+          enum:
+          - docker
+          - exec
+          type: string
+        runs_on:
+          description: RunsOn contains a set of labels that this job requires runners
+            to have.
+          items:
+            type: string
+          type: array
+        docker:
+          $ref: '#/components/schemas/DockerConfigDefinition'
+        step_execution:
+          description: Determines how the runner will execute steps within this job
+          enum:
+          - sequential
+          - parallel
+          type: string
+        depends:
+          description: Dependencies on other jobs and their artifacts (see dependency
+            syntax)
+          items:
+            type: string
+          type: array
+        services:
+          description: "Services to run in the background for the duration of the\
+            \ job; services are started before the first step is run, and stopped\
+            \ after the last step completes"
+          items:
+            $ref: '#/components/schemas/ServiceDefinition'
+          type: array
+        fingerprint:
+          description: Shell commands to execute to generate a unique fingerprint
+            for the jobs; two jobs in the same repo with the same name and fingerprint
+            are considered identical
+          items:
+            type: string
+          type: array
+        artifacts:
+          description: A list of all artifacts the job is expected to produce that
+            will be saved to the artifact store at the end of the job's execution
+          items:
+            $ref: '#/components/schemas/ArtifactDefinition'
+          type: array
+        environment:
+          additionalProperties:
+            $ref: '#/components/schemas/SecretStringDefinition'
+          description: A list of environment variables to export prior to executing
+            the job
+          type: object
+        steps:
+          description: The set of steps within the job
+          items:
+            $ref: '#/components/schemas/StepDefinition'
+          type: array
+      required:
+      - environment
+      - name
+      - step_execution
+      - steps
+      type: object
+    StepDefinition:
+      example:
+        depends:
+        - depends
+        - depends
+        name: compile
+        description: description
+        commands:
+        - commands
+        - commands
+      properties:
+        name:
+          description: "Step name, in URL format"
+          example: compile
+          type: string
+        description:
+          description: Optional human-readable description of the job.
+          type: string
+        commands:
+          description: A list of one or more shell commands to execute during the
+            step.
+          items:
+            type: string
+          type: array
+        depends:
+          description: Dependencies this step has on other steps within the job (see
+            dependency syntax)
+          items:
+            type: string
+          type: array
+      required:
+      - commands
+      - name
+      type: object
+    DockerBasicAuthDefinition:
+      example:
+        password:
+          value: postgres
+          from_secret: database_password
+        username:
+          value: postgres
+          from_secret: database_password
+      properties:
+        username:
+          $ref: '#/components/schemas/SecretStringDefinition'
+        password:
+          $ref: '#/components/schemas/SecretStringDefinition'
+      required:
+      - password
+      - username
+      type: object
+    DockerAWSAuthDefinition:
+      example:
+        aws_region: us-west-2
+        aws_access_key_id:
+          value: postgres
+          from_secret: database_password
+        aws_secret_access_key:
+          value: postgres
+          from_secret: database_password
+      properties:
+        aws_region:
+          description: The ECR AWS region to authenticate to.
+          example: us-west-2
+          type: string
+        aws_access_key_id:
+          $ref: '#/components/schemas/SecretStringDefinition'
+        aws_secret_access_key:
+          $ref: '#/components/schemas/SecretStringDefinition'
+      required:
+      - aws_access_key_id
+      - aws_secret_access_key
+      type: object
+    DockerConfigDefinition:
+      example:
+        basic_auth:
+          password:
+            value: postgres
+            from_secret: database_password
+          username:
+            value: postgres
+            from_secret: database_password
+        image: golang:1.14.7
+        pull: default
+        shell: /bin/bash
+        aws_auth:
+          aws_region: us-west-2
+          aws_access_key_id:
+            value: postgres
+            from_secret: database_password
+          aws_secret_access_key:
+            value: postgres
+            from_secret: database_password
+      properties:
+        image:
+          description: "The default Docker image to run the job steps in, if the job\
+            \ is of type Docker"
+          example: golang:1.14.7
+          type: string
+        pull:
+          description: "Determines if/when the Docker image is pulled during job execution,\
+            \ if the job is of type Docker"
+          enum:
+          - default
+          - never
+          - always
+          - if-not-exists
+          type: string
+        basic_auth:
+          $ref: '#/components/schemas/DockerBasicAuthDefinition'
+        aws_auth:
+          $ref: '#/components/schemas/DockerAWSAuthDefinition'
+        shell:
+          description: Path to the shell to use to run build scripts with inside the
+            container
+          example: /bin/bash
+          type: string
+      required:
+      - image
+      - pull
+      type: object
+    ServiceDefinition:
+      example:
+        basic_auth:
+          password:
+            value: postgres
+            from_secret: database_password
+          username:
+            value: postgres
+            from_secret: database_password
+        image: postgres
+        environment:
+          key:
+            value: postgres
+            from_secret: database_password
+        aws_auth:
+          aws_region: us-west-2
+          aws_access_key_id:
+            value: postgres
+            from_secret: database_password
+          aws_secret_access_key:
+            value: postgres
+            from_secret: database_password
+        name: compile
+      properties:
+        name:
+          description: "Unique name of the service, within the parent job"
+          example: compile
+          type: string
+        image:
+          description: Name of the Docker image for the service to run
+          example: postgres
+          type: string
+        basic_auth:
+          $ref: '#/components/schemas/DockerBasicAuthDefinition'
+        aws_auth:
+          $ref: '#/components/schemas/DockerAWSAuthDefinition'
+        environment:
+          additionalProperties:
+            $ref: '#/components/schemas/SecretStringDefinition'
+          description: A list of environment variables to export prior to executing
+            the service
+          type: object
+      required:
+      - environment
+      - image
+      - name
+      type: object
+    ArtifactDefinition:
+      example:
+        paths:
+        - paths
+        - paths
+        name: compile
+      properties:
+        name:
+          description: Uniquely identifies the group of artifacts specified in paths
+          example: compile
+          type: string
+        paths:
+          description: "One or more relative paths to artifacts that should be uploaded\
+            \ at the end of the build; these paths will be globbed, so that each path\
+            \ may identify one or more actual files"
+          items:
+            type: string
+          type: array
+      required:
+      - name
+      - paths
+      type: object
+    runner_api_endpoints:
+      properties:
+        value:
+          description: "The value of an environment variable, for variables that do\
+            \ not use secrets."
+          example: postgres
+          type: string
+        from_secret:
+          description: "The name of the secret that contains the value, for environment\
+            \ variables that use secrets."
+          example: database_password
+          type: string
+      type: object
+    SecretStringDefinition:
+      example:
+        value: postgres
+        from_secret: database_password
+      properties:
+        value:
+          description: "The value of an environment variable, for variables that do\
+            \ not use secrets."
+          example: postgres
+          type: string
+        from_secret:
+          description: "The name of the secret that contains the value, for environment\
+            \ variables that use secrets."
+          example: database_password
+          type: string
+      type: object
+    Events:
+      items:
+        $ref: '#/components/schemas/Event'
+      type: array
+    Event:
+      example:
+        sequence_number: 0
+        workflow: front-end-workflow
+        job_name: generate-code
+        build_id: build:4738115e-070a-44fe-bce0-b43582583eaa
+        payload: payload
+        created_at: 2000-01-23T04:56:07.000+00:00
+        resource_id: job:2238115e-070a-44fe-bce0-b43582583edd
+        id: id
+        type: BuildStatusChanged
+        resource_name: generate-code
+      properties:
+        id:
+          type: string
+        created_at:
+          format: date-time
+          type: string
+        sequence_number:
+          description: SequenceNumber is a monotonically increasing number to provide
+            a well-defined order for events within a build. Event sequence numbers
+            will normally (but not always) be contiguous for a given build.
+          format: int64
+          type: integer
+        build_id:
+          description: The ID of the build to fetch events for.
+          example: build:4738115e-070a-44fe-bce0-b43582583eaa
+          type: string
+        type:
+          description: "The type of event, determining what is expected in the event\
+            \ data."
+          enum:
+          - BuildStatusChanged
+          - JobStatusChanged
+          - StepStatusChanged
+          type: string
+        resource_id:
+          description: The ID of the resource this event is associated with.
+          example: job:2238115e-070a-44fe-bce0-b43582583edd
+          type: string
+        workflow:
+          description: "The name of the workflow this event is associated with, if\
+            \ applicable"
+          example: front-end-workflow
+          type: string
+        job_name:
+          description: "The name of the job this event relates to, if applicable"
+          example: generate-code
+          type: string
+        resource_name:
+          description: The name of the resource this event is associated with. For
+            job-related events this will be the same as job_name.
+          example: generate-code
+          type: string
+        payload:
+          description: Payload provides additional information for the event. The
+            format of the payload data depends on the event Type.
+          type: string
+      required:
+      - build_id
+      - created_at
+      - id
+      - payload
+      - resource_id
+      - resource_name
+      - sequence_number
+      - type
+      type: object
+    LogDescriptor:
+      example:
+        parent_log_id: parent_log_id
+        size_bytes: 0
+        updated_at: 2000-01-23T04:56:07.000+00:00
+        sealed: true
+        created_at: 2000-01-23T04:56:07.000+00:00
+        resource_id: resource_id
+        etag: etag
+        id: id
+        data_url: data_url
+        url: url
+      properties:
+        url:
+          description: A link to the Log Descriptor on the BuildBeaver server
+          type: string
+        id:
+          type: string
+        created_at:
+          format: date-time
+          type: string
+        updated_at:
+          format: date-time
+          type: string
+        etag:
+          type: string
+        parent_log_id:
+          description: The ID of the log descriptor that this one is nested within.
+          type: string
+        resource_id:
+          description: The ID of the resource that this log belongs to.
+          type: string
+        sealed:
+          description: Sealed is set to true when the log is completed and has become
+            immutable.
+          type: boolean
+        size_bytes:
+          description: "The size of the log, in bytes, calculated and set at the time\
+            \ the log is sealed."
+          format: int64
+          type: integer
+        data_url:
+          description: URL to use for fetching the log data.
+          type: string
+      required:
+      - created_at
+      - data_url
+      - etag
+      - id
+      - parent_log_id
+      - resource_id
+      - sealed
+      - size_bytes
+      - updated_at
+      - url
+      type: object
+    JobGraph2_allOf:
+      properties:
+        steps:
+          description: The set of steps within the job
+          items:
+            $ref: '#/components/schemas/Step'
+          type: array
+      required:
+      - steps
+      type: object
+      example: null
+  securitySchemes:
+    jwt_build_token:
+      in: header
+      name: Authorization
+      type: apiKey
