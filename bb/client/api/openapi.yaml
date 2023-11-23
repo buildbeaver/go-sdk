@@ -1262,10 +1262,6 @@ components:
       - job
       - steps
       type: object
-    JobGraph2:
-      allOf:
-      - $ref: '#/components/schemas/Job'
-      - $ref: '#/components/schemas/JobGraph2_allOf'
     Job:
       example:
         runner_id: runner_id
@@ -3084,17 +3080,6 @@ components:
       - updated_at
       - url
       type: object
-    JobGraph2_allOf:
-      properties:
-        steps:
-          description: The set of steps within the job
-          items:
-            $ref: '#/components/schemas/Step'
-          type: array
-      required:
-      - steps
-      type: object
-      example: null
   securitySchemes:
     jwt_build_token:
       in: header
